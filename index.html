@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Лёша и Ариана</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Лёша и Ариана">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#f5f5f7">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f5f5f7;
+  --bg2: #ffffff;
+  --surface: rgba(255,255,255,0.72);
+  --surface2: rgba(255,255,255,0.55);
+  --border: rgba(0,0,0,0.08);
+  --border2: rgba(0,0,0,0.05);
+  --text: #1d1d1f;
+  --text2: #6e6e73;
+  --text3: #aeaeb2;
+  --blue: #248a3d;
+  --blue2: #2d9e48;
+  --red: #ff3b30;
+  --green: #34c759;
+  --radius: 16px;
+  --radius2: 12px;
+}
+
+html, body {
+  height: 100%; width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* ── CALL SCREEN ────────────────────────── */
+#callScreen {
+  display: none;
+  position: fixed; inset: 0; z-index: 50;
+  background: #000;
+}
+#callScreen.active { display: block; }
+
+#remoteVideo {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: cover;
+}
+
+/* subtle vignette */
+#callScreen::after {
+  content: '';
+  position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background:
+    linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, transparent 20%),
+    linear-gradient(to top,    rgba(0,0,0,0.5) 0%, transparent 30%);
+}
+
+#localVideo {
+  position: absolute; bottom: 108px; right: 16px;
+  width: 88px; height: 118px; object-fit: cover;
+  z-index: 5; border-radius: 14px;
+  border: 2px solid rgba(255,255,255,0.25);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+#localVideo.hidden { display: none; }
+
+/* call top */
+#callTopBar {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+  padding: max(env(safe-area-inset-top,0px),18px) 24px 0;
+  text-align: center;
+}
+#callName {
+  font-size: 17px; font-weight: 600;
+  color: #fff; letter-spacing: -0.2px;
+}
+#callTimer {
+  font-size: 15px; font-weight: 400;
+  color: rgba(255,255,255,0.6);
+  margin-top: 3px; font-variant-numeric: tabular-nums;
+}
+
+/* call controls */
+#callControls {
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 10;
+  padding: 0 0 max(env(safe-area-inset-bottom,0px),32px);
+  display: flex; justify-content: center; align-items: flex-end; gap: 16px;
+  opacity: 0; transition: opacity 0.25s ease;
+}
+#callControls.visible { opacity: 1; }
+
+.c-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: none; border: none; cursor: pointer; padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.c-circle {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: rgba(255,255,255,0.18);
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.12s, background 0.15s;
+}
+.c-btn:active .c-circle { transform: scale(0.92); }
+.c-circle svg { width: 22px; height: 22px; fill: #fff; }
+.c-circle.off { background: rgba(255,255,255,0.9); }
+.c-circle.off svg { fill: #1d1d1f; }
+.c-circle.end {
+  background: var(--red);
+  width: 64px; height: 64px;
+}
+.c-lbl {
+  font-size: 12px; font-weight: 400;
+  color: rgba(255,255,255,0.7);
+  letter-spacing: -0.1px;
+}
+
+/* ── MAIN SCREEN ────────────────────────── */
+#mainScreen {
+  position: relative; z-index: 1;
+  max-width: 430px; margin: 0 auto;
+  padding: 0 20px max(env(safe-area-inset-bottom,0px),40px);
+}
+
+/* header */
+.header {
+  padding: max(env(safe-area-inset-top,0px),52px) 0 32px;
+  display: flex; justify-content: space-between; align-items: flex-start;
+}
+.header-left h1 {
+  font-size: 34px; font-weight: 700;
+  color: var(--text); letter-spacing: -0.5px; line-height: 1.05;
+}
+.header-left p {
+  font-size: 15px; color: var(--text2);
+  margin-top: 3px; letter-spacing: -0.1px;
+}
+.menu-btn {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--border);
+  border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: 4px;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s;
+}
+.menu-btn:active { background: rgba(0,0,0,0.12); }
+.menu-btn svg { width: 14px; height: 14px; fill: var(--text2); }
+
+/* stats */
+.stats-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px; margin-bottom: 10px;
+}
+.stat {
+  background: var(--bg2);
+  border-radius: var(--radius);
+  padding: 16px 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.stat-val {
+  font-size: 22px; font-weight: 600;
+  color: var(--text); letter-spacing: -0.4px;
+  line-height: 1; margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.stat-lbl {
+  font-size: 11px; font-weight: 400;
+  color: var(--text2); letter-spacing: -0.1px;
+}
+
+/* history card */
+.card {
+  background: var(--bg2);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  margin-bottom: 10px;
+}
+.card-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border2);
+}
+.card-row:last-child { border-bottom: none; }
+.row-label { font-size: 15px; color: var(--text); letter-spacing: -0.1px; }
+.row-value {
+  font-size: 15px; color: var(--text2);
+  font-variant-numeric: tabular-nums;
+  display: flex; align-items: center; gap: 5px;
+}
+.row-star { color: #ff9f0a; font-size: 11px; }
+
+.meta-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0 4px; margin-bottom: 24px;
+}
+.sync-pill {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 12px; color: var(--text3);
+}
+.sync-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--green); flex-shrink: 0;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+.clear-btn {
+  background: none; border: none; cursor: pointer;
+  font-size: 12px; color: var(--text3);
+  font-family: inherit; padding: 0;
+}
+.clear-btn:hover { color: var(--red); }
+
+/* section label */
+.section-label {
+  font-size: 13px; font-weight: 600;
+  color: var(--text2); letter-spacing: -0.1px;
+  text-transform: uppercase; font-size: 12px;
+  margin-bottom: 8px; padding: 0 4px;
+}
+
+/* connect cards */
+.connect-card {
+  background: var(--bg2);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  margin-bottom: 10px;
+}
+.connect-title {
+  font-size: 17px; font-weight: 600;
+  color: var(--text); letter-spacing: -0.3px;
+  margin-bottom: 12px;
+}
+.step {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin-bottom: 9px; font-size: 15px;
+  color: var(--text2); line-height: 1.45; letter-spacing: -0.1px;
+}
+.step:last-of-type { margin-bottom: 0; }
+.step-n {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--blue); color: #fff;
+  font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: 1px;
+}
+
+/* divider */
+.divider {
+  height: 1px; background: var(--border);
+  margin: 6px 0 16px;
+}
+.or-row {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 13px; color: var(--text3);
+  margin: 6px 0 10px;
+}
+.or-row::before, .or-row::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+
+/* textarea */
+.field-wrap { margin-top: 14px; }
+.field-label {
+  font-size: 12px; font-weight: 500;
+  color: var(--text2); margin-bottom: 6px;
+  letter-spacing: -0.1px;
+}
+textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius2);
+  color: var(--text);
+  font-family: 'SF Mono', 'Menlo', monospace;
+  font-size: 12px; line-height: 1.6;
+  padding: 10px 12px; resize: none; height: 72px;
+  outline: none; transition: border-color 0.15s;
+}
+textarea:focus { border-color: var(--blue); }
+textarea::placeholder { color: var(--text3); }
+.field-hint {
+  font-size: 12px; color: var(--text3);
+  margin-top: 5px; letter-spacing: -0.1px;
+}
+
+/* buttons */
+.btn {
+  width: 100%; padding: 14px;
+  border: none; border-radius: var(--radius2);
+  font-family: inherit; font-size: 15px; font-weight: 600;
+  letter-spacing: -0.2px; cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+  margin-top: 10px;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:active { opacity: 0.75; transform: scale(0.99); }
+.btn-primary { background: var(--blue); color: #fff; }
+.btn-secondary {
+  background: var(--bg);
+  color: var(--blue);
+  border: 1.5px solid var(--border);
+  margin-top: 8px;
+}
+
+/* sidebar */
+#sidebar {
+  position: fixed; top: 0; right: 0;
+  height: 100%; width: 300px; max-width: 85vw;
+  background: rgba(242,242,247,0.95);
+  backdrop-filter: blur(40px) saturate(1.8);
+  -webkit-backdrop-filter: blur(40px) saturate(1.8);
+  border-left: 1px solid var(--border);
+  z-index: 90;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+  overflow-y: auto;
+  padding: max(env(safe-area-inset-top,0px),52px) 24px 40px;
+}
+#sidebar.open { transform: translateX(0); }
+#sideOverlay {
+  position: fixed; inset: 0; z-index: 89;
+  background: rgba(0,0,0,0.3);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
+}
+#sideOverlay.open { opacity: 1; pointer-events: all; }
+
+.sidebar-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 24px;
+}
+.sidebar-title { font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
+.sidebar-close {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(0,0,0,0.08);
+  border: none; cursor: pointer;
+  font-size: 13px; color: var(--text2);
+  display: flex; align-items: center; justify-content: center;
+  font-family: inherit;
+}
+.sidebar-text {
+  font-size: 15px; line-height: 1.6;
+  color: var(--text2); letter-spacing: -0.1px;
+}
+.sidebar-text p { margin-bottom: 14px; }
+.sidebar-text strong { color: var(--text); font-weight: 600; }
+
+/* summary */
+.sum-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.sum-box {
+  background: rgba(255,255,255,0.96);
+  border-radius: 24px;
+  padding: 36px 28px;
+  text-align: center; width: 100%; max-width: 300px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.2);
+}
+.sum-icon {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: rgba(52,199,89,0.12);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px;
+}
+.sum-icon svg { width: 28px; height: 28px; fill: var(--green); }
+.sum-box h3 { font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; margin-bottom: 4px; }
+.sum-sub { font-size: 15px; color: var(--text2); margin-bottom: 20px; }
+.sum-time { font-size: 52px; font-weight: 300; color: var(--text); letter-spacing: -2px; line-height: 1; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+.sum-total { font-size: 13px; color: var(--text3); margin-bottom: 24px; }
+
+
+/* ── WAITING ANIMATION ─────────────────── */
+#waitingAnim {
+  position: absolute; inset: 0; z-index: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #0a0a0a 100%);
+  gap: 16px;
+}
+.wait-icon-wrap {
+  position: relative; width: 130px; height: 130px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 8px;
+}
+.wait-ring {
+  position: absolute; border-radius: 50%;
+  animation: ripple 2.6s ease-out infinite;
+}
+.wait-ring:nth-child(1){ width:78px;  height:78px;  animation-delay:0s;    background: radial-gradient(circle, rgba(180,40,30,0.25), rgba(210,140,80,0.1)); }
+.wait-ring:nth-child(2){ width:104px; height:104px; animation-delay:0.65s; background: radial-gradient(circle, rgba(180,40,30,0.18), rgba(210,140,80,0.07)); }
+.wait-ring:nth-child(3){ width:130px; height:130px; animation-delay:1.3s;  background: radial-gradient(circle, rgba(180,40,30,0.1),  rgba(210,140,80,0.04)); }
+@keyframes ripple {
+  0%   { transform: scale(0.82); opacity: 0.9; }
+  100% { transform: scale(1.18); opacity: 0; }
+}
+.wait-app-icon {
+  width: 60px; height: 60px;
+  border-radius: 14px; overflow: hidden;
+  position: relative; z-index: 2;
+  animation: iconPulse 2.6s ease-in-out infinite;
+}
+.wait-app-icon img { width: 100%; height: 100%; object-fit: cover; }
+@keyframes iconPulse {
+  0%,100% { transform: scale(1);    box-shadow: 0 0 18px rgba(180,40,30,0.4), 0 0 36px rgba(210,120,60,0.2); }
+  50%      { transform: scale(1.07); box-shadow: 0 0 32px rgba(180,40,30,0.7), 0 0 60px rgba(210,120,60,0.35); }
+}
+.wait-text { color: rgba(255,255,255,0.75); font-size: 16px; font-weight: 500; letter-spacing: -0.2px; }
+.wait-dots::after { content: ''; animation: dots 1.5s steps(4,end) infinite; }
+@keyframes dots { 0%{content:''} 25%{content:'.'} 50%{content:'..'} 75%{content:'...'} }
+
+/* ── QUALITY INDICATOR ─────────────────── */
+#qualityBadge {
+  position: absolute; top: 0; right: 16px; z-index: 10;
+  padding-top: max(env(safe-area-inset-top,0px),20px);
+  display: flex; align-items: center; gap: 5px;
+  opacity: 0; transition: opacity 0.3s;
+}
+#qualityBadge.visible { opacity: 1; }
+.q-bars { display: flex; align-items: flex-end; gap: 2px; }
+.q-bar {
+  width: 3px; border-radius: 2px;
+  background: rgba(255,255,255,0.3);
+  transition: background 0.5s, height 0.3s;
+}
+.q-bar:nth-child(1){ height: 6px; }
+.q-bar:nth-child(2){ height: 10px; }
+.q-bar:nth-child(3){ height: 14px; }
+.q-bar.active { background: #fff; }
+.q-bar.good   { background: #34c759; }
+.q-bar.ok     { background: #ff9f0a; }
+.q-bar.bad    { background: #ff3b30; }
+#qualityLabel {
+  font-size: 11px; color: rgba(255,255,255,0.6); letter-spacing: -0.1px;
+}
+
+/* ── RECONNECT BANNER ──────────────────── */
+#reconnectBanner {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  z-index: 20; background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-radius: 16px; padding: 20px 28px; text-align: center;
+  display: none;
+}
+#reconnectBanner.show { display: block; }
+#reconnectBanner p { color: #fff; font-size: 15px; margin-bottom: 4px; }
+#reconnectBanner small { color: rgba(255,255,255,0.5); font-size: 13px; }
+.spin { animation: spin 1s linear infinite; display: inline-block; margin-right: 6px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── FLIP BUTTON ───────────────────────── */
+#localVideo { cursor: pointer; }
+#localVideo:active { opacity: 0.8; }
+
+
+/* ── DARK MODE ─────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:  #1c1c1e;
+    --bg2: #2c2c2e;
+    --border:  rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.05);
+    --text:  #f5f5f7;
+    --text2: #aeaeb2;
+    --text3: #6e6e73;
+  }
+  textarea {
+    background: #1c1c1e;
+    color: #f5f5f7;
+  }
+  .sum-box { background: rgba(44,44,46,0.97) !important; }
+  .sum-box h3, .sum-box .sum-time { color: #f5f5f7 !important; }
+}
+
+/* ── ENTRANCE ANIMATION ────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.header        { animation: fadeUp 0.45s ease both; animation-delay: 0.05s; }
+#countdownCard { animation: fadeUp 0.45s ease both; animation-delay: 0.12s; }
+#togetherBanner{ animation: fadeUp 0.45s ease both; animation-delay: 0.18s; }
+.stats-grid    { animation: fadeUp 0.45s ease both; animation-delay: 0.22s; }
+#historyList   { animation: fadeUp 0.45s ease both; animation-delay: 0.26s; }
+.meta-row      { animation: fadeUp 0.45s ease both; animation-delay: 0.28s; }
+.connect-card  { animation: fadeUp 0.45s ease both; animation-delay: 0.32s; }
+.or-row        { animation: fadeUp 0.45s ease both; animation-delay: 0.34s; }
+
+
+/* ── CLOCKS ────────────────────────────── */
+#clocksBar {
+  display: flex; gap: 10px; margin-bottom: 10px;
+}
+.clock-card {
+  flex: 1; background: var(--bg2);
+  border-radius: var(--radius); padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  animation: fadeUp 0.45s ease both; animation-delay: 0.08s;
+}
+.clock-city { font-size: 11px; color: var(--text3); margin-bottom: 4px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px; }
+.clock-time { font-size: 22px; font-weight: 600; color: var(--text); letter-spacing: -0.4px; font-variant-numeric: tabular-nums; }
+.clock-diff { font-size: 12px; color: var(--text3); margin-top: 2px; }
+
+/* ── ACTIVITY CHART ────────────────────── */
+#activityCard {
+  background: var(--bg2); border-radius: var(--radius);
+  padding: 16px 16px 12px; margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  animation: fadeUp 0.45s ease both; animation-delay: 0.24s;
+}
+.activity-header {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 12px;
+}
+.activity-title { font-size: 13px; font-weight: 600; color: var(--text2); text-transform: uppercase; font-size: 12px; letter-spacing: 0.3px; }
+.activity-avg   { font-size: 12px; color: var(--text3); }
+#activityBars {
+  display: flex; align-items: flex-end; gap: 3px; height: 44px;
+}
+.a-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.a-bar {
+  width: 100%; border-radius: 3px 3px 0 0;
+  background: var(--blue); opacity: 0.25;
+  transition: height 0.4s ease, opacity 0.3s;
+  min-height: 2px;
+}
+.a-bar.has-call { opacity: 1; }
+.a-bar.today    { opacity: 0.85; }
+.a-lbl { font-size: 9px; color: var(--text3); }
+
+/* ── CALL SCREEN CLOCKS ────────────────── */
+#callClocks {
+  position: absolute; bottom: 108px; left: 16px; z-index: 5;
+  display: flex; flex-direction: column; gap: 4px;
+  opacity: 0; transition: opacity 0.25s;
+}
+#callControls.visible ~ #callClocks,
+#callClocks.visible { opacity: 1; }
+.cc-item { font-size: 12px; color: rgba(255,255,255,0.7); font-variant-numeric: tabular-nums; }
+.cc-city { font-size: 10px; color: rgba(255,255,255,0.4); }
+
+/* ── BEAUTIFUL SUMMARY ─────────────────── */
+.sum-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  display: flex; align-items: flex-end; justify-content: center;
+  padding-bottom: max(env(safe-area-inset-bottom,0px), 24px);
+  animation: sumFadeIn 0.35s ease;
+}
+@keyframes sumFadeIn { from{opacity:0} to{opacity:1} }
+.sum-box {
+  background: var(--bg2);
+  border-radius: 28px 28px 20px 20px;
+  padding: 32px 28px 28px;
+  width: 100%; max-width: 430px;
+  box-shadow: 0 -4px 40px rgba(0,0,0,0.15);
+  animation: sumSlideUp 0.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes sumSlideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+.sum-pill {
+  width: 36px; height: 4px; border-radius: 2px;
+  background: var(--border); margin: 0 auto 24px;
+}
+.sum-icon {
+  width: 60px; height: 60px; border-radius: 50%;
+  background: rgba(52,199,89,0.12);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 14px;
+}
+.sum-icon svg { width: 30px; height: 30px; fill: var(--green); }
+.sum-box h3 { font-size: 22px; font-weight: 700; color: var(--text); letter-spacing: -0.4px; text-align:center; margin-bottom: 24px; }
+.sum-stats-row { display: flex; gap: 10px; margin-bottom: 16px; }
+.sum-stat {
+  flex: 1; background: var(--bg); border-radius: 14px; padding: 14px 12px; text-align: center;
+}
+.sum-stat-val { font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -0.4px; font-variant-numeric: tabular-nums; }
+.sum-stat-lbl { font-size: 11px; color: var(--text3); margin-top: 3px; }
+.sum-total-line { font-size: 13px; color: var(--text3); text-align: center; margin-bottom: 20px; }
+
+/* ── COPY IN FIELD ─────────────────────── */
+.field-copy-wrap { position: relative; }
+.field-copy-wrap textarea { padding-right: 80px; }
+.copy-inline-btn {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  background: var(--blue); color: #fff; border: none; border-radius: 8px;
+  font-size: 12px; font-weight: 600; font-family: inherit;
+  padding: 5px 10px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.copy-inline-btn:active { opacity: 0.75; }
+
+
+/* ── TAB BAR ───────────────────────────── */
+#tabBar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
+  background: rgba(250,250,252,0.88);
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  border-top: 1px solid var(--border);
+  display: flex;
+  padding-bottom: max(env(safe-area-inset-bottom,0px), 8px);
+}
+@media (prefers-color-scheme: dark) {
+  #tabBar { background: rgba(28,28,30,0.88); }
+}
+.tab-btn {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 3px; padding: 8px 0;
+  background: none; border: none; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 0.15s;
+}
+.tab-btn svg { width: 24px; height: 24px; fill: var(--text3); transition: fill 0.15s; }
+.tab-btn span { font-size: 10px; font-weight: 500; color: var(--text3); letter-spacing: -0.1px; transition: color 0.15s; }
+.tab-btn.active svg { fill: var(--blue); }
+.tab-btn.active span { color: var(--blue); }
+
+/* Tab pages */
+.tab-page { display: none; }
+.tab-page.active { display: block; }
+
+/* Adjust main screen padding for tab bar */
+#mainScreen { padding-bottom: max(env(safe-area-inset-bottom,0px), 80px) !important; }
+
+/* History list like Telegram */
+.hist-section-title {
+  font-size: 13px; font-weight: 600; color: var(--text3);
+  padding: 18px 20px 6px; letter-spacing: -0.1px;
+  text-transform: uppercase; font-size: 11px;
+}
+.hist-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border2);
+  background: var(--bg2);
+}
+.hist-row:last-child { border-bottom: none; }
+.hist-avatar {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--blue); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.hist-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.hist-info { flex: 1; min-width: 0; }
+.hist-title { font-size: 16px; font-weight: 500; color: var(--text); letter-spacing: -0.2px; }
+.hist-dur { font-size: 13px; color: var(--text3); margin-top: 1px; }
+.hist-time { font-size: 13px; color: var(--text3); flex-shrink: 0; }
+.hist-star { color: #ff9f0a; font-size: 11px; margin-left: 3px; }
+
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- CALL SCREEN -->
+<div id="callScreen">
+  <video id="remoteVideo" playsinline></video>
+  <!-- In-call clocks -->
+  <div id="callClocks">
+    <div class="cc-item"><span id="ccEdin">—</span> <span class="cc-city">EDI</span></div>
+    <div class="cc-item"><span id="ccMoscow">—</span> <span class="cc-city">MSK</span></div>
+  </div>
+
+  <video id="localVideo" muted playsinline class="hidden"></video>
+
+  <!-- Waiting animation -->
+  <div id="waitingAnim">
+    <div class="wait-icon-wrap">
+      <div class="wait-ring"></div>
+      <div class="wait-ring"></div>
+      <div class="wait-ring"></div>
+      <div class="wait-app-icon">
+        <img src="apple-touch-icon.png" alt="">
+      </div>
+    </div>
+    <div class="wait-text">Ждём<span class="wait-dots"></span></div>
+  </div>
+
+  <!-- Reconnect banner -->
+  <div id="reconnectBanner">
+    <p><span class="spin">↻</span>Переподключение...</p>
+    <small>связь прервалась, восстанавливаем</small>
+  </div>
+
+  <!-- Quality indicator -->
+  <div id="qualityBadge">
+    <div class="q-bars">
+      <div class="q-bar" id="qb1"></div>
+      <div class="q-bar" id="qb2"></div>
+      <div class="q-bar" id="qb3"></div>
+    </div>
+    <span id="qualityLabel"></span>
+  </div>
+
+  <div id="callTopBar">
+    <div id="callName">Лёша и Ариана</div>
+    <div id="callTimer"></div>
+  </div>
+
+  <div id="callControls">
+    <button class="c-btn" id="btnMic">
+      <div class="c-circle" id="micCircle">
+        <svg viewBox="0 0 24 24"><path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-2.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+      </div>
+      <span class="c-lbl">звук</span>
+    </button>
+    <button class="c-btn" id="btnCam">
+      <div class="c-circle" id="camCircle">
+        <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+      </div>
+      <span class="c-lbl">камера</span>
+    </button>
+    <button class="c-btn" id="btnEnd">
+      <div class="c-circle end">
+        <svg viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.15 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+      </div>
+      <span class="c-lbl">завершить</span>
+    </button>
+    <button class="c-btn" id="btnFlip">
+      <div class="c-circle">
+        <svg viewBox="0 0 24 24"><path d="M20 5h-3.17L15 3H9L7.17 5H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-8 13c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.65 0-3 1.35-3 3s1.35 3 3 3 3-1.35 3-3-1.35-3-3-3z"/></svg>
+      </div>
+      <span class="c-lbl">камера</span>
+    </button>
+    <button class="c-btn" id="btnFull">
+      <div class="c-circle">
+        <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+      </div>
+      <span class="c-lbl">экран</span>
+    </button>
+  </div>
+</div>
+
+<!-- MAIN SCREEN -->
+<div id="mainScreen">
+
+  <!-- ── TAB: ЗВОНКИ ── -->
+  <div id="tabCalls" class="tab-page active">
+    <div class="header">
+      <div class="header-left">
+        <h1>Лёша и Ариана</h1>
+        <p>любовь на расстоянии</p>
+        <p id="lastCallLine" style="font-size:13px;color:var(--text3);margin-top:2px;letter-spacing:-0.1px;"></p>
+      </div>
+    </div>
+
+    <!-- Call button -->
+    <div id="callStatusCard" style="background:var(--bg2);border-radius:var(--radius);padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06);margin-bottom:10px;">
+      <div id="sigStatus" style="font-size:12px;color:var(--text3);margin-bottom:14px;display:flex;align-items:center;gap:6px;">
+        <span id="sigDot" style="width:6px;height:6px;border-radius:50%;background:var(--text3);display:inline-block;flex-shrink:0;"></span>
+        <span id="sigText">подключение к серверу...</span>
+      </div>
+      <div id="incomingBanner" class="hidden" style="background:rgba(36,138,61,0.1);border-radius:12px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:15px;font-weight:600;color:var(--blue);">📞 Входящий звонок</span>
+        <button class="btn btn-primary" style="width:auto;padding:8px 18px;margin-top:0;" onclick="acceptIncoming()">Ответить</button>
+      </div>
+      <button class="btn btn-primary" id="btnCallMain" onclick="startCall()">Позвонить</button>
+      <div id="callingStatus" class="hidden" style="text-align:center;padding:12px 0 4px;color:var(--text2);font-size:15px;">
+        <span id="callingText">Звоним...</span>
+        <br><button onclick="cancelCall()" style="background:none;border:none;color:var(--red);font-size:13px;font-family:inherit;margin-top:8px;cursor:pointer;">Отменить</button>
+      </div>
+    </div>
+
+    <!-- Clocks -->
+    <div id="clocksBar">
+      <div class="clock-card">
+        <div class="clock-city">Эдинбург</div>
+        <div class="clock-time" id="clockEdin">—</div>
+        <div class="clock-diff" id="clockEdinDate"></div>
+      </div>
+      <div class="clock-card">
+        <div class="clock-city">Москва</div>
+        <div class="clock-time" id="clockMoscow">—</div>
+        <div class="clock-diff" id="clockMoscowDate"></div>
+      </div>
+    </div>
+
+    <!-- Countdown -->
+    <div id="countdownCard" style="background:var(--blue);border-radius:var(--radius);padding:18px 20px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+      <div style="font-size:12px;font-weight:500;color:rgba(255,255,255,0.7);margin-bottom:8px;">до встречи</div>
+      <div id="countdownDisplay" style="font-size:28px;font-weight:700;color:#fff;letter-spacing:-0.6px;line-height:1;font-variant-numeric:tabular-nums;">—</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.55);margin-top:6px;">29 марта</div>
+    </div>
+
+    <!-- History like Telegram -->
+    <div id="historyList">
+      <div class="hist-section-title">Недавние</div>
+      <div style="background:var(--bg2);border-radius:var(--radius);overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+        <div class="hist-row">
+          <span style="color:var(--text3);font-size:14px;padding:4px 0;">загрузка...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TAB: СТАТИСТИКА ── -->
+  <div id="tabStats" class="tab-page">
+    <div class="header">
+      <div class="header-left">
+        <h1>Статистика</h1>
+        <p style="font-size:15px;color:var(--text2);margin-top:3px;">Лёша и Ариана</p>
+      </div>
+    </div>
+
+    <!-- Together time -->
+    <div style="background:var(--bg2);border-radius:var(--radius);padding:18px 20px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+      <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:6px;">всего вместе</div>
+      <div id="statTotal" style="font-size:28px;font-weight:700;color:var(--text);letter-spacing:-0.6px;line-height:1;">—</div>
+    </div>
+
+    <!-- Stats grid -->
+    <div class="stats-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:10px;">
+      <div class="stat">
+        <div class="stat-val" id="statCount">—</div>
+        <div class="stat-lbl">звонков</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="statRecord">—</div>
+        <div class="stat-lbl">рекорд</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="statAvg">—</div>
+        <div class="stat-lbl">среднее</div>
+      </div>
+    </div>
+
+    <!-- Activity chart -->
+    <div id="activityCard">
+      <div class="activity-header">
+        <span class="activity-title">активность</span>
+        <span class="activity-avg" id="activityAvg"></span>
+      </div>
+      <div id="activityBars"></div>
+    </div>
+
+    <div class="meta-row" style="margin-top:8px;">
+      <div class="sync-pill" id="syncLine">
+        <span class="sync-dot"></span> синхронизировано
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- TAB BAR -->
+<div id="tabBar">
+  <button class="tab-btn active" id="tabBtnCalls" onclick="switchTab('calls')">
+    <svg viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.15 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+    <span>Звонки</span>
+  </button>
+  <button class="tab-btn" id="tabBtnStats" onclick="switchTab('stats')">
+    <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H7v-2h5v2zm5-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+    <span>Статистика</span>
+  </button>
+</div><div id="sidebar">
+  <div class="sidebar-header">
+    <span class="sidebar-title">О приложении</span>
+    <button class="sidebar-close" onclick="closeSidebar()">✕</button>
+  </div>
+  <div class="sidebar-text">
+    <p>Личное приложение для видеозвонков. Только вы двое.</p>
+    <p>Видео и звук передаются <strong>напрямую</strong> — без серверов посередине.</p>
+    <p>Качество до <strong>1080p HD</strong>, 30 кадров/с, стерео звук с шумоподавлением.</p>
+    <p style="color:var(--text3);">Работает в Chrome, Safari, Firefox на любом устройстве.</p>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, push, onValue, remove } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+const db = getDatabase(initializeApp({
+  apiKey: "AIzaSyDC7lmB3YUIqdsMStafZ-OU0afwEKorXFQ",
+  authDomain: "pozvonimnepozvoni-f49f8.firebaseapp.com",
+  databaseURL: "https://pozvonimnepozvoni-f49f8-default-rtdb.firebaseio.com",
+  projectId: "pozvonimnepozvoni-f49f8",
+  storageBucket: "pozvonimnepozvoni-f49f8.firebasestorage.app",
+  messagingSenderId: "93270528108",
+  appId: "1:93270528108:web:312cdb83442a2ec98b4849"
+}));
+const callsRef = ref(db, 'calls');
+
+function fmtDur(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;if(h>0)return`${h}ч ${m}м`;if(m>0)return`${m}м ${sec}с`;return`${sec}с`;}
+function fmtShort(s){
+  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60);
+  if(h>0&&m>0)return`${h} ч ${m} мин`;
+  if(h>0)return`${h} часов`;
+  return`${m} минут`;
+}
+function fmtClock(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;if(h>0)return`${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;return`${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;}
+function fmtDate(iso){return new Date(iso).toLocaleDateString('ru-RU',{day:'numeric',month:'short'});}
+function plural(n){if(n%10===1&&n%100!==11)return'звонок';if([2,3,4].includes(n%10)&&![12,13,14].includes(n%100))return'звонка';return'звонков';}
+
+window.allCalls=[];
+onValue(callsRef,snap=>{
+  window.allCalls=[];
+  snap.forEach(c=>allCalls.push({id:c.key,...c.val()}));
+  window.allCalls.sort((a,b)=>new Date(b.date)-new Date(a.date));
+  renderStats();
+  document.getElementById('syncLine').innerHTML='<span class="sync-dot"></span> синхронизировано';
+},()=>{document.getElementById('syncLine').textContent='нет связи';});
+
+function renderStats(){
+  const total=allCalls.reduce((s,c)=>s+c.seconds,0);
+  const rec=allCalls.reduce((m,c)=>c.seconds>m?c.seconds:m,0);
+  document.getElementById('statTotal').textContent=allCalls.length?fmtShort(total):'—';
+  document.getElementById('statCount').textContent=allCalls.length||'—';
+  document.getElementById('statRecord').textContent=rec>0?fmtShort(rec):'—';
+  const list=document.getElementById('historyList');
+  if(!allCalls.length){list.innerHTML='<div class="card-row"><span class="row-label" style="color:var(--text3);font-size:14px;">Звонков пока не было</span></div>';return;}
+  list.innerHTML=allCalls.map(c=>`<div class="card-row"><span class="row-label">${fmtDate(c.date)}</span><span class="row-value">${fmtDur(c.seconds)}${c.seconds===rec&&rec>0?'<span class="row-star">★</span>':''}</span></div>`).join('');
+
+  // Last call line under subtitle
+  const last = allCalls[0];
+  const ll = document.getElementById('lastCallLine');
+  renderActivity();
+  if(ll && last) {
+    const d = new Date(last.date);
+    const now = new Date();
+    const diffD = Math.floor((now - d) / 86400000);
+    const when = diffD === 0 ? 'сегодня' : diffD === 1 ? 'вчера' : fmtDate(last.date);
+    ll.textContent = `последний раз ${when}, ${fmtDur(last.seconds)}`;
+  }
+}
+
+window.clearStats=async()=>{if(!confirm('Очистить историю?'))return;await remove(callsRef);};
+window.saveCall=async sec=>{if(sec<5)return;await push(callsRef,{date:new Date().toISOString(),seconds:sec});};
+
+</script>
+
+<script>
+/* WebRTC + Signaling — plain script, NOT module, so Safari preserves user gesture context */
+let pc=null,localStream=null,micMuted=false,camOff=false,callStart=null,timerInt=null,qualityInt=null,reconnectAttempts=0,usingFront=true;
+let iceCandidateBuffer=[];
+
+const RTC_CONFIG = {
+  iceServers: [
+    {urls:'stun:stun.l.google.com:19302'},
+    {urls:'stun:stun1.l.google.com:19302'},
+    {urls:'stun:stun.cloudflare.com:3478'}
+  ]
+};
+
+async function getMedia() {
+  // Stop any existing stream first
+  if (localStream) { localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
+  const facing = usingFront ? 'user' : 'environment';
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: facing, width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:30} },
+      audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true }
+    });
+  } catch(e) {
+    // Fallback — any camera
+    localStream = await navigator.mediaDevices.getUserMedia({ video:true, audio:true });
+  }
+  const lv = document.getElementById('localVideo');
+  lv.srcObject = localStream;
+  lv.classList.remove('hidden');
+  // Safari requires explicit play() called during user gesture
+  await lv.play().catch(() => {});
+}
+
+function makePC() {
+  if (pc) { pc.close(); pc = null; }
+  iceCandidateBuffer = [];
+  pc = new RTCPeerConnection(RTC_CONFIG);
+
+  // Add local tracks
+  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+  // Remote video
+  const rv = document.getElementById('remoteVideo');
+  if (!rv.srcObject) rv.srcObject = new MediaStream();
+
+  pc.ontrack = e => {
+    const rs = rv.srcObject;
+    const track = e.track;
+    // Remove old track of same kind, add new one
+    rs.getTracks().filter(t => t.kind === track.kind).forEach(t => rs.removeTrack(t));
+    rs.addTrack(track);
+    // iOS Safari needs explicit play() call
+    if (rs.getVideoTracks().length > 0) {
+      document.getElementById('waitingAnim').style.display = 'none';
+      document.getElementById('reconnectBanner').classList.remove('show');
+    }
+  };
+
+  // Trickle ICE — send candidates as they arrive
+  pc.onicecandidate = e => {
+    if (e.candidate) send({ type: 'ice', candidate: e.candidate });
+  };
+
+  pc.oniceconnectionstatechange = () => {
+    const s = pc.iceConnectionState;
+    if (s === 'connected' || s === 'completed') {
+      reconnectAttempts = 0;
+      document.getElementById('reconnectBanner').classList.remove('show');
+    }
+    if (s === 'disconnected' || s === 'failed') {
+      if (reconnectAttempts < 3) {
+        reconnectAttempts++;
+        document.getElementById('reconnectBanner').classList.add('show');
+        try { pc.restartIce(); } catch(e) {}
+        setTimeout(() => {
+          if (pc && (pc.iceConnectionState==='disconnected'||pc.iceConnectionState==='failed')) {
+            endCall();
+          }
+        }, 8000);
+      } else { endCall(); }
+    }
+  };
+}
+
+async function gatherICE(p) {
+  return new Promise(res => {
+    const cs = [];
+    const done = () => res(cs);
+    const t = setTimeout(done, 3000);
+    p.onicecandidate = e => {
+      if (e.candidate) cs.push(e.candidate);
+      else { clearTimeout(t); done(); }
+    };
+  });
+}
+const enc=obj=>btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+const dec=s=>JSON.parse(decodeURIComponent(escape(atob(s))));
+
+
+// ── PUSH NOTIFICATIONS ───────────────────
+const VAPID_KEY = 'BIv-h5biJfGCkCtpLpBuNRerlPGD2KSWzVRyFZ04p0MfK3Vva11RNDYtEiTBuJ8CxApsd6IOZs9DQOXEWZCvR8k';
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+async function subscribePush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return null;
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_KEY)
+      });
+    }
+    return JSON.stringify(sub);
+  } catch(e) { console.log('Push subscribe failed:', e); return null; }
+}
+
+// ── WEBSOCKET SIGNALING ──────────────────
+let ws = null;
+let wsReady = false;
+let pendingOffer = null;
+
+function connectSignaling() {
+  ws = new WebSocket('wss://signaling-production-473e.up.railway.app');
+
+  ws.onopen = () => {
+    wsReady = true;
+    // Register immediately — don't wait for push permission
+    ws.send(JSON.stringify({ type: 'register' }));
+    setSigStatus('online', 'на связи');
+    // Push token sent separately after SW is ready
+    subscribePush().then(pushSub => {
+      if (pushSub && ws.readyState === 1) {
+        ws.send(JSON.stringify({ type: 'fcm_token', token: pushSub }));
+      }
+    });
+  };
+
+  ws.onmessage = async (e) => {
+    let msg; try { msg = JSON.parse(e.data); } catch { return; }
+
+    if (msg.type === 'presence') {
+      setSigStatus('online', msg.count >= 2 ? 'собеседник онлайн' : 'на связи');
+    }
+
+    if (msg.type === 'offer') {
+      pendingOffer = msg;
+      document.getElementById('incomingBanner').classList.remove('hidden');
+      document.getElementById('btnCallMain').classList.add('hidden');
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+    }
+
+    if (msg.type === 'answer') {
+      if (!pc) return;
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+        for (const cand of (msg.candidates || []))
+          await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(()=>{});
+        for (const cand of iceCandidateBuffer)
+          await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(()=>{});
+        iceCandidateBuffer = [];
+      } catch(e) { console.error('answer error:', e); }
+    }
+
+    if (msg.type === 'ice') {
+      if (!msg.candidate) return;
+      if (pc && pc.remoteDescription) {
+        pc.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(e => console.warn('ICE add failed:', e));
+      } else {
+        iceCandidateBuffer.push(msg.candidate);
+      }
+    }
+
+    if (msg.type === 'bye') {
+      endCall();
+    }
+  };
+
+  ws.onclose = () => {
+    wsReady = false;
+    setSigStatus('offline', 'нет соединения с сервером');
+    setTimeout(connectSignaling, 3000);
+  };
+
+  ws.onerror = () => ws.close();
+}
+
+function setSigStatus(state, text) {
+  const dot = document.getElementById('sigDot');
+  const txt = document.getElementById('sigText');
+  if (!dot || !txt) return;
+  txt.textContent = text;
+  dot.style.background = state === 'online' ? 'var(--green)' : state === 'offline' ? 'var(--red)' : 'var(--text3)';
+}
+
+function send(msg) {
+  if (ws && wsReady) ws.send(JSON.stringify(msg));
+}
+
+connectSignaling();
+
+window.startCall = async () => {
+  try {
+    document.getElementById('btnCallMain').classList.add('hidden');
+    document.getElementById('callingStatus').classList.remove('hidden');
+    document.getElementById('callingText').textContent = 'Звоним...';
+    await getMedia();
+    makePC();
+    showCallScreen();
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    // Send offer immediately, ICE candidates trickle separately via onicecandidate
+    send({ type: 'offer', sdp: pc.localDescription, candidates: [] });
+  } catch(e) {
+    console.error('startCall error:', e);
+    alert('Не удалось начать звонок: ' + e.message);
+    resetCallUI();
+  }
+};
+
+window.acceptIncoming = async () => {
+  if (!pendingOffer) return;
+  try {
+    document.getElementById('incomingBanner').classList.add('hidden');
+    document.getElementById('btnCallMain').classList.add('hidden');
+    await getMedia();
+    makePC();
+    showCallScreen();
+    await pc.setRemoteDescription(new RTCSessionDescription(pendingOffer.sdp));
+    for (const cand of (pendingOffer.candidates || []))
+      await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(()=>{});
+    for (const cand of iceCandidateBuffer)
+      await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(()=>{});
+    iceCandidateBuffer = [];
+    const ans = await pc.createAnswer();
+    await pc.setLocalDescription(ans);
+    // Send answer immediately, ICE candidates trickle separately
+    send({ type: 'answer', sdp: pc.localDescription, candidates: [] });
+    pendingOffer = null;
+  } catch(e) {
+    console.error('acceptIncoming error:', e);
+    alert('Не удалось ответить: ' + e.message);
+    resetCallUI();
+  }
+};
+
+window.cancelCall = () => {
+  send({ type: 'bye' });
+  if (pc) { pc.close(); pc = null; }
+  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+  document.getElementById('callingStatus').classList.add('hidden');
+  document.getElementById('btnCallMain').classList.remove('hidden');
+};
+
+function showCallScreen() {
+  document.getElementById('mainScreen').classList.add('hidden');
+  document.getElementById('callScreen').classList.add('active');
+  document.getElementById('waitingAnim').style.display = '';
+  // Pre-play remote video while we still have the user gesture context
+  const rv = document.getElementById('remoteVideo');
+  rv.srcObject = new MediaStream();
+  rv.play().catch(() => {});
+  startCallUI();
+}
+
+function resetCallUI() {
+  document.getElementById('callingStatus').classList.add('hidden');
+  document.getElementById('incomingBanner').classList.add('hidden');
+  document.getElementById('btnCallMain').classList.remove('hidden');
+  pendingOffer = null;
+}
+
+let wakeLock=null;
+async function startCallUI(){
+  callStart=Date.now();
+  timerInt=setInterval(()=>{document.getElementById('callTimer').textContent=fmtClock(Math.floor((Date.now()-callStart)/1000));},1000);
+  const cs=document.getElementById('callControls');
+  // Remove old listener before adding new one
+  if (window._callClickHandler) document.getElementById('callScreen').removeEventListener('click', window._callClickHandler);
+  window._callClickHandler = () => {
+    cs.classList.add('visible');
+    document.getElementById('qualityBadge').classList.add('visible');
+    clearTimeout(window._ct);
+    window._ct=setTimeout(()=>{cs.classList.remove('visible');},3500);
+  };
+  document.getElementById('callScreen').addEventListener('click', window._callClickHandler, {passive:true});
+
+  // Keep screen on
+  try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){}
+
+  // Vibrate on connect
+  if(navigator.vibrate) navigator.vibrate([80, 60, 80]);
+
+  // Max volume hint (works on Android)
+  try {
+    const ac = new AudioContext();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    gain.gain.setValueAtTime(0, ac.currentTime);
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.start(); osc.stop(ac.currentTime + 0.01);
+  } catch(e) {}
+
+  // Quality monitoring
+  qualityInt=setInterval(async()=>{
+    if(!pc)return;
+    try{
+      const stats=await pc.getStats();
+      let rtt=null,loss=null;
+      stats.forEach(r=>{
+        if(r.type==='candidate-pair'&&r.state==='succeeded'&&r.currentRoundTripTime!=null) rtt=r.currentRoundTripTime*1000;
+        if(r.type==='inbound-rtp'&&r.kind==='video'){
+          const total=r.packetsReceived+(r.packetsLost||0);
+          if(total>0) loss=(r.packetsLost||0)/total*100;
+        }
+      });
+      updateQuality(rtt,loss);
+    }catch(e){}
+  },3000);
+}
+
+function updateQuality(rtt,loss){
+  const b1=document.getElementById('qb1'),b2=document.getElementById('qb2'),b3=document.getElementById('qb3');
+  const lbl=document.getElementById('qualityLabel');
+  [b1,b2,b3].forEach(b=>b.className='q-bar');
+  let level='good',text='';
+  if(rtt===null){level='ok';text='';}
+  else if(rtt<100&&(loss===null||loss<2)){level='good';text='';}
+  else if(rtt<250&&(loss===null||loss<8)){level='ok';text='';}
+  else{level='bad';text='';}
+  if(level==='good'){b1.classList.add('active','good');b2.classList.add('active','good');b3.classList.add('active','good');}
+  else if(level==='ok'){b1.classList.add('active','ok');b2.classList.add('active','ok');}
+  else{b1.classList.add('active','bad');}
+  lbl.textContent=text;
+}
+
+async function endCall(){
+  clearInterval(timerInt);timerInt=null;
+  clearInterval(qualityInt);qualityInt=null;
+  try { if(wakeLock) { await wakeLock.release(); wakeLock=null; } } catch(e){}
+  if(navigator.vibrate) navigator.vibrate(120);
+  const dur=callStart?Math.floor((Date.now()-callStart)/1000):0;callStart=null;
+  if(pc){pc.close();pc=null;}
+  if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
+  document.getElementById('localVideo').classList.add('hidden');
+  const rv = document.getElementById('remoteVideo');
+  if (rv.srcObject) { rv.srcObject.getTracks().forEach(t=>t.stop()); rv.srcObject = null; }
+  document.getElementById('callScreen').classList.remove('active');
+  document.getElementById('mainScreen').classList.remove('hidden');
+  document.getElementById('callTimer').textContent='';
+  document.getElementById('waitingAnim').style.display='';
+  document.getElementById('reconnectBanner').classList.remove('show');
+  document.getElementById('qualityBadge').classList.remove('visible');
+  resetCallUI();
+  reconnectAttempts=0;
+  send({ type: 'bye' });
+  if(dur>=5){await window.saveCall(dur);showSummary(dur);}
+}
+
+function showSummary(dur){
+  const total=(window.allCalls||[]).reduce((s,c)=>s+c.seconds,0)+dur;
+  const n=(window.allCalls||[]).length+1;
+  const avg=Math.round(total/n);
+  const rec=Math.max(...(window.allCalls||[]).map(c=>c.seconds),dur);
+  const isRec=dur>=rec;
+  const ov=document.createElement('div');ov.className='sum-overlay';
+  ov.innerHTML=`<div class="sum-box">
+    <div class="sum-pill"></div>
+    <div class="sum-icon"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
+    <h3>${isRec?'🎉 Новый рекорд!':'Звонок завершён'}</h3>
+    <div class="sum-stats-row">
+      <div class="sum-stat">
+        <div class="sum-stat-val">${fmtClock(dur)}</div>
+        <div class="sum-stat-lbl">этот звонок</div>
+      </div>
+      <div class="sum-stat">
+        <div class="sum-stat-val">${fmtShort(total)}</div>
+        <div class="sum-stat-lbl">всего вместе</div>
+      </div>
+      <div class="sum-stat">
+        <div class="sum-stat-val">${fmtClock(avg)}</div>
+        <div class="sum-stat-lbl">среднее</div>
+      </div>
+    </div>
+    <div class="sum-total-line">${n} ${plural(n)} · рекорд ${fmtClock(rec)}</div>
+    <button class="btn btn-primary" style="margin-top:0" onclick="this.closest('.sum-overlay').remove()">Готово</button>
+  </div>`;
+  document.body.appendChild(ov);
+}
+
+// Flip camera
+document.getElementById('btnFlip').onclick=async()=>{
+  if(!localStream||!pc)return;
+  usingFront=!usingFront;
+  const oldTracks=localStream.getVideoTracks();
+  const newStream=await navigator.mediaDevices.getUserMedia({
+    video:{facingMode:usingFront?'user':'environment',width:{ideal:1280},height:{ideal:720}},
+    audio:false
+  }).catch(()=>null);
+  if(!newStream)return;
+  const newTrack=newStream.getVideoTracks()[0];
+  const sender=pc.getSenders().find(s=>s.track&&s.track.kind==='video');
+  if(sender)await sender.replaceTrack(newTrack);
+  oldTracks.forEach(t=>t.stop());
+  localStream.removeTrack(oldTracks[0]);
+  localStream.addTrack(newTrack);
+  document.getElementById('localVideo').srcObject=localStream;
+  // flip animation
+  const lv=document.getElementById('localVideo');
+  lv.style.transition='transform 0.3s';
+  lv.style.transform='scaleX(0)';
+  setTimeout(()=>{lv.style.transform='scaleX(1)';},300);
+};
+
+document.getElementById('btnMic').onclick=()=>{micMuted=!micMuted;localStream?.getAudioTracks().forEach(t=>t.enabled=!micMuted);document.getElementById('micCircle').classList.toggle('off',micMuted);};
+document.getElementById('btnCam').onclick=()=>{camOff=!camOff;localStream?.getVideoTracks().forEach(t=>t.enabled=!camOff);document.getElementById('camCircle').classList.toggle('off',camOff);};
+document.getElementById('btnEnd').onclick=endCall;
+document.getElementById('btnFull').onclick=()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen().catch(()=>{});else document.exitFullscreen();};
+
+
+// ── CLOCKS ──────────────────────────────
+function fmtTime(date){ return date.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',hour12:false}); }
+function fmtDayShort(date){ return date.toLocaleDateString('ru-RU',{weekday:'short',day:'numeric',month:'short'}); }
+
+function updateClocks(){
+  const now = new Date();
+  const edin   = new Date(now.toLocaleString('en-US',{timeZone:'Europe/London'}));
+  const moscow = new Date(now.toLocaleString('en-US',{timeZone:'Europe/Moscow'}));
+
+  document.getElementById('clockEdin').textContent   = fmtTime(edin);
+  document.getElementById('clockMoscow').textContent = fmtTime(moscow);
+  document.getElementById('clockEdinDate').textContent   = fmtDayShort(edin);
+  document.getElementById('clockMoscowDate').textContent = fmtDayShort(moscow);
+
+  // In-call clocks
+  if(document.getElementById('ccEdin')){
+    document.getElementById('ccEdin').textContent   = fmtTime(edin);
+    document.getElementById('ccMoscow').textContent = fmtTime(moscow);
+  }
+}
+updateClocks();
+setInterval(updateClocks, 1000);
+
+// ── ACTIVITY CHART ───────────────────────
+function renderActivity(){
+  const bars = document.getElementById('activityBars');
+  if(!bars) return;
+  const avg = allCalls.length ? Math.round(allCalls.reduce((s,c)=>s+c.seconds,0)/allCalls.length) : 0;
+  document.getElementById('activityAvg').textContent = avg ? 'сред. ' + fmtClock(avg) : '';
+
+  // Last 28 days
+  const days = 28;
+  const buckets = {};
+  for(let i=0;i<days;i++){
+    const d = new Date(); d.setDate(d.getDate()-i);
+    buckets[d.toDateString()] = 0;
+  }
+  allCalls.forEach(call=>{
+    const key = new Date(call.date).toDateString();
+    if(key in buckets) buckets[key] += call.seconds;
+  });
+  const vals = Object.values(buckets).reverse();
+  const maxVal = Math.max(...vals, 1);
+  const todayKey = new Date().toDateString();
+
+  bars.innerHTML = vals.map((v,i)=>{
+    const h = Math.max(2, Math.round((v/maxVal)*44));
+    const isToday = i === vals.length-1;
+    const cls = v>0 ? (isToday?'a-bar today':'a-bar has-call') : 'a-bar';
+    const dayLabel = i % 7 === 0 ? ['4н','3н','2н','1н',''][Math.floor(i/7)] : '';
+    return `<div class="a-bar-wrap"><div class="${cls}" style="height:${h}px"></div><div class="a-lbl">${dayLabel}</div></div>`;
+  }).join('');
+}
+
+// ── COPY + TELEGRAM ──────────────────────
+window.copyAndTelegram = (fieldId) => {
+  const val = document.getElementById(fieldId).value;
+  if(!val) return;
+  navigator.clipboard.writeText(val).catch(()=>{
+    const el = document.getElementById(fieldId); el.select(); document.execCommand('copy');
+  });
+  // Save to sessionStorage so it survives app switch
+  sessionStorage.setItem('lastCode_'+fieldId, val);
+  // Try to open Telegram
+  setTimeout(()=>{
+    const tg = 'tg://msg?text='+encodeURIComponent(val);
+    const a = document.createElement('a'); a.href=tg; a.click();
+  }, 300);
+};
+
+// session restore removed — using signaling server
+
+// ── SHOW CLOCKS IN CALL ──────────────────
+document.getElementById('callScreen').addEventListener('click', ()=>{
+  document.getElementById('callClocks').classList.add('visible');
+  clearTimeout(window._cct);
+  window._cct = setTimeout(()=>document.getElementById('callClocks').classList.remove('visible'), 3500);
+}, {passive:true});
+
+
+window.switchTab = (tab) => {
+  document.getElementById('tabCalls').classList.toggle('active', tab==='calls');
+  document.getElementById('tabStats').classList.toggle('active', tab==='stats');
+  document.getElementById('tabBtnCalls').classList.toggle('active', tab==='calls');
+  document.getElementById('tabBtnStats').classList.toggle('active', tab==='stats');
+};
+window.copyOffer=()=>{const v=document.getElementById('offerText').value;navigator.clipboard.writeText(v).then(()=>alert('Скопировано!')).catch(()=>{document.getElementById('offerText').select();document.execCommand('copy');});};
+
+// Countdown to March 29, 5:00 AM
+function updateCountdown() {
+  const target = new Date('2026-03-29T00:00:00');
+  const now = new Date();
+  const diff = target - now;
+
+  if (diff <= 0) {
+    document.getElementById('countdownDisplay').textContent = 'уже сегодня! 🎉';
+    document.getElementById('countdownCard').style.background = 'var(--green)';
+    return;
+  }
+
+  const days = Math.floor(diff / (1000*60*60*24));
+  const hours = Math.floor((diff % (1000*60*60*24)) / (1000*60*60));
+  const mins = Math.floor((diff % (1000*60*60)) / (1000*60));
+  const secs = Math.floor((diff % (1000*60)) / 1000);
+
+  let parts = [];
+  if (days > 0) parts.push(days + ' д');
+  if (hours > 0 || days > 0) parts.push(String(hours).padStart(2,'0') + ' ч');
+  parts.push(String(mins).padStart(2,'0') + ' мин');
+  if (days === 0) parts.push(String(secs).padStart(2,'0') + ' с');
+
+  document.getElementById('countdownDisplay').textContent = parts.join(' ');
+}
+updateCountdown();
+setInterval(updateCountdown, 1000);
+
+window.copyAnswer=()=>{const v=document.getElementById('answerText').value;navigator.clipboard.writeText(v).then(()=>alert('Скопировано!')).catch(()=>{document.getElementById('answerText').select();document.execCommand('copy');});};
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
