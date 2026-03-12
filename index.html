@@ -959,20 +959,17 @@ async function getMedia(front=true){
 function makePC(){
   pc=new RTCPeerConnection(rtc);
   localStream.getTracks().forEach(t=>{const s=pc.addTrack(t,localStream);if(t.kind==='video'){const p=s.getParameters();if(!p.encodings)p.encodings=[{}];p.encodings[0].maxBitrate=4000000;s.setParameters(p).catch(()=>{});}});
-  const remoteStream = new MediaStream();
-  document.getElementById('remoteVideo').srcObject = remoteStream;
   pc.ontrack = e => {
-    e.streams[0].getTracks().forEach(t => {
-      if (!remoteStream.getTracks().includes(t)) remoteStream.addTrack(t);
-    });
-    if (remoteStream.getTracks().length > 0) {
-      document.getElementById('waitingAnim').style.display='none';
-      document.getElementById('mainScreen').classList.add('hidden');
-      document.getElementById('callScreen').classList.add('active');
-      reconnectAttempts=0;
-      document.getElementById('reconnectBanner').classList.remove('show');
-      startCallUI();
+    const rv = document.getElementById('remoteVideo');
+    if (e.streams && e.streams[0]) {
+      rv.srcObject = e.streams[0];
+    } else {
+      if (!rv.srcObject) rv.srcObject = new MediaStream();
+      rv.srcObject.addTrack(e.track);
     }
+    document.getElementById('waitingAnim').style.display='none';
+    reconnectAttempts=0;
+    document.getElementById('reconnectBanner').classList.remove('show');
   };
   pc.oniceconnectionstatechange=()=>{
     const state=pc.iceConnectionState;
@@ -1069,6 +1066,9 @@ function connectSignaling() {
       if (!pc) return;
       await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
       for (const c of (msg.candidates || [])) await pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
+      // Hide "calling..." status on main screen
+      document.getElementById('callingStatus').classList.add('hidden');
+      document.getElementById('btnCallMain').classList.remove('hidden');
     }
 
     if (msg.type === 'ice') {
@@ -1110,7 +1110,7 @@ window.startCall = async () => {
   await getMedia(); makePC();
   document.getElementById('mainScreen').classList.add('hidden');
   document.getElementById('callScreen').classList.add('active');
-  startCallUI();
+  startCallUI(); // show timer and controls
   const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
   await pc.setLocalDescription(offer);
   const cs = await gatherICE(pc);
@@ -1126,7 +1126,7 @@ window.acceptIncoming = async () => {
   await getMedia(); makePC();
   document.getElementById('mainScreen').classList.add('hidden');
   document.getElementById('callScreen').classList.add('active');
-  startCallUI();
+  startCallUI(); // show timer and controls
   await pc.setRemoteDescription(new RTCSessionDescription(pendingOffer.sdp));
   for (const c of (pendingOffer.candidates || [])) await pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
   const ans = await pc.createAnswer();
