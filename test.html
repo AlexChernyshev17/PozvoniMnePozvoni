@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebRTC Test</title>
+<style>
+body { font-family: monospace; padding: 16px; background: #000; color: #0f0; font-size: 13px; }
+button { display: block; width: 100%; padding: 12px; margin: 8px 0; font-size: 15px; background: #1a1a1a; color: #0f0; border: 1px solid #0f0; cursor: pointer; }
+video { width: 100%; height: 200px; background: #111; display: block; margin: 8px 0; object-fit: cover; }
+#log { white-space: pre-wrap; height: 300px; overflow-y: auto; border: 1px solid #333; padding: 8px; margin-top: 8px; }
+.ok { color: #0f0; } .err { color: #f00; } .info { color: #ff0; }
+</style>
+</head>
+<body>
+<h3>WebRTC Diagnostic</h3>
+
+<button onclick="testCamera()">1. Test Camera</button>
+<button onclick="testSignaling()">2. Test Signaling Server</button>
+<button onclick="testCall()">3. Start Call (open on 2nd device too)</button>
+<button onclick="acceptCall()">4. Accept Incoming Call</button>
+<button onclick="endTest()">5. End</button>
+
+<div>Local: <video id="local" autoplay muted playsinline></video></div>
+<div>Remote: <video id="remote" autoplay playsinline></video></div>
+<div id="log">Waiting...\n</div>
+
+<script>
+const WS_URL = 'wss://signaling-production-473e.up.railway.app';
+let ws, pc, localStream, pendingOffer;
+let iceCandidateBuffer = []; // buffer ICE candidates that arrive before remote description
+
+function log(msg, cls='') {
+  const d = document.getElementById('log');
+  const t = new Date().toLocaleTimeString();
+  d.innerHTML += `<span class="${cls}">[${t}] ${msg}\n</span>`;
+  d.scrollTop = d.scrollHeight;
+}
+
+async function testCamera() {
+  log('Requesting camera...', 'info');
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
+    const lv = document.getElementById('local');
+    lv.srcObject = localStream;
+    await lv.play().catch(e => log('local play: '+e, 'info'));
+    log('✅ Camera OK: ' + localStream.getVideoTracks()[0].label, 'ok');
+    log('Audio: ' + localStream.getAudioTracks()[0].label, 'ok');
+  } catch(e) {
+    log('❌ Camera FAILED: ' + e.message, 'err');
+  }
+}
+
+function testSignaling() {
+  log('Connecting to signaling...', 'info');
+  ws = new WebSocket(WS_URL);
+  ws.onopen = () => {
+    log('✅ WebSocket connected', 'ok');
+    ws.send(JSON.stringify({type:'register'}));
+    log('Sent register', 'info');
+  };
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    log('← ' + JSON.stringify(msg), 'info');
+    if (msg.type === 'presence') {
+      log(msg.count >= 2 ? '✅ Both peers online!' : '⚠️ Waiting for 2nd peer', msg.count>=2?'ok':'info');
+    }
+    if (msg.type === 'offer') {
+      pendingOffer = msg;
+      log('📞 Incoming offer received! Press Accept.', 'ok');
+    }
+    if (msg.type === 'answer') {
+      log('✅ Answer received! Setting remote...', 'ok');
+      pc.setRemoteDescription(new RTCSessionDescription(msg.sdp))
+        .then(async () => {
+          log('✅ Remote SDP set OK', 'ok');
+          for (const cand of iceCandidateBuffer) {
+            await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(e => log('Buffered ICE fail: '+e,'err'));
+          }
+          log('Flushed ' + iceCandidateBuffer.length + ' buffered ICE candidates', 'info');
+          iceCandidateBuffer = [];
+        })
+        .catch(e => log('❌ setRemoteDescription failed: '+e.message, 'err'));
+    }
+    if (msg.type === 'ice') {
+      if (!msg.candidate) return;
+      if (pc && pc.remoteDescription) {
+        pc.addIceCandidate(new RTCIceCandidate(msg.candidate))
+          .then(() => log('ICE candidate added', 'info'))
+          .catch(e => log('ICE add failed: '+e, 'err'));
+      } else {
+        iceCandidateBuffer.push(msg.candidate);
+        log('ICE buffered (no remote desc yet)', 'info');
+      }
+    }
+  };
+  ws.onerror = e => log('❌ WebSocket error', 'err');
+  ws.onclose = () => log('WebSocket closed', 'err');
+}
+
+function makePeerConnection() {
+  iceCandidateBuffer = [];
+  pc = new RTCPeerConnection({
+    iceServers: [
+      {urls:'stun:stun.l.google.com:19302'},
+      {urls:'stun:stun1.l.google.com:19302'}
+    ]
+  });
+
+  localStream.getTracks().forEach(t => {
+    pc.addTrack(t, localStream);
+    log('Added local ' + t.kind + ' track', 'info');
+  });
+
+  const rv = document.getElementById('remote');
+  rv.srcObject = new MediaStream();
+  // Play IMMEDIATELY while we still have user gesture context (button click)
+  rv.play().catch(e => log('pre-play failed: '+e, 'info'));
+
+  pc.ontrack = e => {
+    log('✅ Got remote track: ' + e.track.kind, 'ok');
+    rv.srcObject.addTrack(e.track);
+    if (rv.paused) rv.play().catch(err => log('resume play: '+err, 'info'));
+  };
+
+  pc.onicecandidate = e => {
+    if (e.candidate) {
+      log('→ Sending ICE candidate', 'info');
+      ws.send(JSON.stringify({type:'ice', candidate:e.candidate}));
+    } else {
+      log('ICE gathering complete', 'info');
+    }
+  };
+
+  pc.oniceconnectionstatechange = () => {
+    log('ICE state: ' + pc.iceConnectionState, pc.iceConnectionState==='connected'?'ok':'info');
+  };
+
+  pc.onsignalingstatechange = () => {
+    log('Signaling state: ' + pc.signalingState, 'info');
+  };
+}
+
+async function testCall() {
+  if (!localStream) { log('Run camera test first!', 'err'); return; }
+  if (!ws || ws.readyState !== 1) { log('Run signaling test first!', 'err'); return; }
+  log('Creating offer...', 'info');
+  makePeerConnection();
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  log('✅ Offer created, sending...', 'ok');
+  ws.send(JSON.stringify({type:'offer', sdp:pc.localDescription, candidates:[]}));
+  log('Waiting for answer...', 'info');
+}
+
+async function acceptCall() {
+  if (!pendingOffer) { log('No pending offer!', 'err'); return; }
+  if (!localStream) { log('Run camera test first!', 'err'); return; }
+  if (!ws || ws.readyState !== 1) { log('Run signaling test first!', 'err'); return; }
+  log('Accepting call...', 'info');
+  makePeerConnection();
+  await pc.setRemoteDescription(new RTCSessionDescription(pendingOffer.sdp));
+  log('✅ Remote offer set', 'ok');
+  const ans = await pc.createAnswer();
+  await pc.setLocalDescription(ans);
+  ws.send(JSON.stringify({type:'answer', sdp:pc.localDescription, candidates:[]}));
+  log('✅ Answer sent', 'ok');
+  pendingOffer = null;
+}
+
+function endTest() {
+  if (pc) { pc.close(); pc=null; }
+  if (localStream) { localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
+  if (ws) { ws.close(); }
+  document.getElementById('local').srcObject = null;
+  document.getElementById('remote').srcObject = null;
+  log('Ended.', 'info');
+}
+</script>
+</body>
+</html>
