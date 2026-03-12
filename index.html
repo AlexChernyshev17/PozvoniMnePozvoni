@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>только мы двое</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0a0f; --surface: #12121a; --border: rgba(255,255,255,0.07);
+    --accent: #c9a96e; --accent2: #8b6bb1; --text: #e8e4dc; --muted: rgba(232,228,220,0.4);
+  }
+  body {
+    background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace;
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    justify-content: flex-start; overflow-x: hidden; padding-bottom: 40px;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background: radial-gradient(ellipse 60% 50% at 20% 30%, rgba(139,107,177,0.08) 0%, transparent 60%),
+                radial-gradient(ellipse 50% 60% at 80% 70%, rgba(201,169,110,0.06) 0%, transparent 60%);
+    pointer-events: none; z-index: 0;
+  }
+  .app {
+    position: relative; z-index: 1; width: 100%; max-width: 1100px;
+    padding: 24px; display: flex; flex-direction: column; align-items: center; gap: 16px;
+  }
+  header {
+    text-align: center; letter-spacing: 0.25em; font-size: 11px;
+    color: var(--muted); text-transform: uppercase; padding-top: 8px;
+  }
+  header span { color: var(--accent); }
+
+  .screens { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; }
+  @media (max-width: 700px) { .screens { grid-template-columns: 1fr; } }
+
+  .video-wrap {
+    position: relative; border-radius: 16px; overflow: hidden;
+    background: var(--surface); border: 1px solid var(--border);
+    aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center;
+  }
+  .video-wrap video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .video-label {
+    position: absolute; bottom: 12px; left: 14px; font-size: 10px;
+    letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.5);
+    background: rgba(0,0,0,0.4); padding: 4px 10px; border-radius: 20px; backdrop-filter: blur(8px);
+  }
+  .video-placeholder {
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    color: var(--muted); font-size: 11px; letter-spacing: 0.15em; text-align: center; padding: 20px;
+  }
+  .video-placeholder svg { opacity: 0.3; }
+  .quality-badge {
+    position: absolute; top: 12px; right: 14px; font-size: 9px; letter-spacing: 0.15em;
+    text-transform: uppercase; color: #4caf50; background: rgba(0,0,0,0.4);
+    padding: 3px 8px; border-radius: 20px; backdrop-filter: blur(8px);
+  }
+
+  .live-timer {
+    font-family: 'Cormorant Garamond', serif; font-size: 32px; font-weight: 300;
+    color: var(--accent); letter-spacing: 0.15em; text-align: center;
+  }
+
+  .controls { display: flex; gap: 12px; align-items: center; }
+  .ctrl-btn {
+    width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; padding: 0; font-size: 18px;
+  }
+  .ctrl-btn:hover { background: rgba(255,255,255,0.08); transform: scale(1.05); }
+  .ctrl-btn.muted { background: rgba(220,80,80,0.2); border-color: rgba(220,80,80,0.4); color: #e07070; }
+  .ctrl-btn.end-call { background: rgba(220,80,80,0.8); border-color: transparent; width: 56px; height: 56px; }
+  .ctrl-btn.end-call:hover { background: rgba(220,80,80,1); }
+
+  .status { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); text-align: center; }
+  .status .dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: #4caf50; margin-right: 6px; animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 28px 32px; width: 100%; max-width: 560px;
+  }
+  .panel h2 {
+    font-family: 'Cormorant Garamond', serif; font-weight: 300; font-size: 22px;
+    margin-bottom: 18px; color: var(--text);
+  }
+  .panel h2 em { font-style: italic; color: var(--accent); }
+
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 22px; }
+  .stat-card {
+    background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 10px; text-align: center;
+  }
+  .stat-value {
+    font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 300;
+    color: var(--accent); line-height: 1; margin-bottom: 6px;
+  }
+  .stat-value.purple { color: var(--accent2); }
+  .stat-label { font-size: 8px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted); }
+
+  .history-title { font-size: 9px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  .history-list { display: flex; flex-direction: column; gap: 5px; max-height: 180px; overflow-y: auto; }
+  .history-list::-webkit-scrollbar { width: 3px; }
+  .history-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .history-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 12px; background: rgba(255,255,255,0.02);
+    border-radius: 8px; border: 1px solid var(--border);
+  }
+  .history-date { font-size: 10px; color: var(--muted); }
+  .history-dur { font-size: 11px; color: var(--text); display: flex; align-items: center; gap: 6px; }
+  .history-record { font-size: 8px; color: var(--accent); letter-spacing: 0.15em; }
+  .stats-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
+  .sync-status { font-size: 9px; letter-spacing: 0.1em; color: var(--muted); }
+  .sync-status.live { color: #4caf50; }
+  .btn-tiny {
+    font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 0.2em;
+    text-transform: uppercase; background: none; border: 1px solid var(--border);
+    color: var(--muted); border-radius: 8px; padding: 6px 14px; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-tiny:hover { color: #e07070; border-color: rgba(220,80,80,0.4); }
+
+  .step { margin-bottom: 20px; }
+  .step-label { font-size: 9px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  textarea {
+    width: 100%; background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+    border-radius: 10px; color: var(--text); font-family: 'DM Mono', monospace;
+    font-size: 10px; padding: 10px 14px; resize: none; transition: border-color 0.2s; outline: none;
+    height: 80px; line-height: 1.6;
+  }
+  textarea:focus { border-color: var(--accent2); }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  button {
+    font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.2em;
+    text-transform: uppercase; border: none; border-radius: 10px;
+    padding: 10px 20px; cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  }
+  .btn-primary { background: var(--accent); color: #0a0a0f; font-weight: 400; }
+  .btn-primary:hover { background: #d4b87a; transform: translateY(-1px); }
+  .btn-secondary { background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+  .copy-hint { font-size: 9px; color: var(--muted); margin-top: 6px; letter-spacing: 0.1em; }
+  .divider {
+    display: flex; align-items: center; gap: 12px; color: var(--muted);
+    font-size: 9px; letter-spacing: 0.2em; margin: 16px 0;
+  }
+  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .summary-overlay {
+    position: fixed; inset: 0; background: rgba(10,10,15,0.92); z-index: 100;
+    display: flex; align-items: center; justify-content: center; backdrop-filter: blur(10px);
+  }
+  .summary-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; padding: 36px 40px; text-align: center; max-width: 340px; width: 90%;
+  }
+  .summary-box h3 {
+    font-family: 'Cormorant Garamond', serif; font-weight: 300; font-style: italic;
+    font-size: 26px; color: var(--accent); margin-bottom: 6px;
+  }
+  .summary-box p { font-size: 10px; color: var(--muted); letter-spacing: 0.2em; margin-bottom: 20px; }
+  .summary-duration {
+    font-family: 'Cormorant Garamond', serif; font-size: 56px; font-weight: 300;
+    color: var(--text); line-height: 1; margin-bottom: 4px;
+  }
+  .summary-total { font-size: 10px; color: var(--muted); letter-spacing: 0.15em; margin-bottom: 24px; }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>только мы двое &nbsp;·&nbsp; <span>p2p видеосвязь</span></header>
+
+  <div class="screens">
+    <div class="video-wrap">
+      <video id="localVideo" autoplay muted playsinline></video>
+      <div class="video-label">ты</div>
+      <div class="video-placeholder" id="localPlaceholder">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+          <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+        </svg>
+        <span>камера выключена</span>
+      </div>
+      <div class="quality-badge hidden" id="qualityBadge">HD</div>
+    </div>
+    <div class="video-wrap" id="remoteWrap">
+      <video id="remoteVideo" autoplay playsinline></video>
+      <div class="video-label">она</div>
+      <div class="video-placeholder" id="remotePlaceholder">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+          <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+        </svg>
+        <span>ожидание соединения...</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="live-timer hidden" id="liveTimer">00:00:00</div>
+
+  <div class="controls hidden" id="callControls">
+    <button class="ctrl-btn" id="toggleMic">🎤</button>
+    <button class="ctrl-btn" id="toggleCam">📷</button>
+    <button class="ctrl-btn end-call" id="endCall">📵</button>
+    <button class="ctrl-btn" id="toggleFullscreen">⛶</button>
+  </div>
+
+  <div class="status hidden" id="callStatus"><span class="dot"></span>соединение установлено</div>
+
+  <!-- Stats -->
+  <div class="panel" id="statsPanel">
+    <h2>♡ &nbsp;<em>наша статистика</em></h2>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="statTotal">—</div>
+        <div class="stat-label">всего времени</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value purple" id="statCount">—</div>
+        <div class="stat-label">звонков</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statRecord">—</div>
+        <div class="stat-label">рекорд</div>
+      </div>
+    </div>
+    <div class="history-title">история звонков</div>
+    <div class="history-list" id="historyList">
+      <div style="font-size:10px; color:var(--muted); text-align:center; padding:16px; letter-spacing:0.1em;">загрузка...</div>
+    </div>
+    <div class="stats-footer">
+      <span class="sync-status" id="syncStatus">подключение...</span>
+      <button class="btn-tiny" onclick="clearStats()">очистить историю</button>
+    </div>
+  </div>
+
+  <!-- Connect -->
+  <div class="panel" id="connectPanel">
+    <h2><em>Как подключиться</em></h2>
+    <div style="font-size:11px; color:var(--muted); line-height:1.8; margin-bottom:20px;">
+      P2P связь — видео идёт напрямую между вами, без сервера.<br>
+      <strong style="color:var(--text);">Один</strong> создаёт приглашение → отправляет → <strong style="color:var(--text);">другой</strong> принимает → отвечает обратно.
+    </div>
+
+    <div class="step" id="stepCreate">
+      <div class="step-label">ты звонишь первым</div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="startCall()">📞 Создать приглашение</button>
+      </div>
+    </div>
+    <div class="step hidden" id="stepOffer">
+      <div class="step-label">скопируй и отправь ей (телеграм, смс...)</div>
+      <textarea id="offerText" readonly onclick="this.select()"></textarea>
+      <div class="copy-hint">↑ нажми чтобы выделить, потом Ctrl+C</div>
+      <div class="btn-row" style="margin-top:10px;">
+        <button class="btn-secondary" onclick="copyOffer()">📋 Скопировать</button>
+      </div>
+    </div>
+
+    <div class="divider">или</div>
+
+    <div class="step" id="stepAnswer">
+      <div class="step-label">она звонит — вставь её приглашение</div>
+      <textarea id="offerInput" placeholder="вставь сюда код от неё..."></textarea>
+      <div class="btn-row" style="margin-top:10px;">
+        <button class="btn-primary" onclick="acceptCall()">✅ Принять звонок</button>
+      </div>
+    </div>
+    <div class="step hidden" id="stepAnswerSend">
+      <div class="step-label">отправь ей этот ответ</div>
+      <textarea id="answerText" readonly onclick="this.select()"></textarea>
+      <div class="copy-hint">↑ скопируй и отправь обратно</div>
+      <div class="btn-row" style="margin-top:10px;">
+        <button class="btn-secondary" onclick="copyAnswer()">📋 Скопировать</button>
+      </div>
+    </div>
+    <div class="step hidden" id="stepFinal">
+      <div class="step-label">вставь её ответ сюда</div>
+      <textarea id="answerInput" placeholder="вставь сюда ответ от неё..."></textarea>
+      <div class="btn-row" style="margin-top:10px;">
+        <button class="btn-primary" onclick="finalConnect()">🔗 Соединить</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, push, onValue, remove, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+// ── Firebase config ────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyDC7lmB3YUIqdsMStafZ-OU0afwEKorXFQ",
+  authDomain: "pozvonimnepozvoni-f49f8.firebaseapp.com",
+  databaseURL: "https://pozvonimnepozvoni-f49f8-default-rtdb.firebaseio.com",
+  projectId: "pozvonimnepozvoni-f49f8",
+  storageBucket: "pozvonimnepozvoni-f49f8.firebasestorage.app",
+  messagingSenderId: "93270528108",
+  appId: "1:93270528108:web:312cdb83442a2ec98b4849"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const callsRef = ref(db, 'calls');
+
+// ── Helpers ────────────────────────────────────────
+function fmtDur(s) {
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  if (h > 0) return `${h}ч ${m}м`;
+  if (m > 0) return `${m}м ${sec}с`;
+  return `${sec}с`;
+}
+function fmtClock(s) {
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+function fmtDate(iso) {
+  return new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+function pluralCalls(n) {
+  if (n % 10 === 1 && n % 100 !== 11) return 'звонок';
+  if ([2,3,4].includes(n % 10) && ![12,13,14].includes(n % 100)) return 'звонка';
+  return 'звонков';
+}
+
+// ── Realtime stats listener ────────────────────────
+let allCalls = [];
+
+onValue(callsRef, (snapshot) => {
+  document.getElementById('syncStatus').textContent = '● синхронизировано';
+  document.getElementById('syncStatus').className = 'sync-status live';
+
+  allCalls = [];
+  snapshot.forEach(child => {
+    allCalls.push({ id: child.key, ...child.val() });
+  });
+  // Sort newest first
+  allCalls.sort((a, b) => new Date(b.date) - new Date(a.date));
+  renderStats();
+}, (error) => {
+  document.getElementById('syncStatus').textContent = 'нет соединения';
+  document.getElementById('syncStatus').className = 'sync-status';
+});
+
+function renderStats() {
+  const total = allCalls.reduce((s, c) => s + c.seconds, 0);
+  const rec = allCalls.reduce((m, c) => c.seconds > m ? c.seconds : m, 0);
+
+  document.getElementById('statTotal').textContent = allCalls.length ? fmtDur(total) : '0м';
+  document.getElementById('statCount').textContent = allCalls.length;
+  document.getElementById('statRecord').textContent = rec > 0 ? fmtDur(rec) : '—';
+
+  const list = document.getElementById('historyList');
+  if (!allCalls.length) {
+    list.innerHTML = '<div style="font-size:10px;color:var(--muted);text-align:center;padding:16px;letter-spacing:0.1em;">пока звонков не было</div>';
+    return;
+  }
+  list.innerHTML = allCalls.map(c => {
+    const isRec = c.seconds === rec && rec > 0;
+    return `<div class="history-item">
+      <span class="history-date">${fmtDate(c.date)}</span>
+      <span class="history-dur">${fmtDur(c.seconds)}${isRec ? '<span class="history-record">★ рекорд</span>' : ''}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Save call to Firebase ──────────────────────────
+window.saveCallToFirebase = async function(seconds) {
+  if (seconds < 5) return;
+  await push(callsRef, { date: new Date().toISOString(), seconds });
+};
+
+// ── Clear stats ────────────────────────────────────
+window.clearStats = async function() {
+  if (!confirm('Очистить всю историю звонков? Это увидите оба.')) return;
+  await remove(callsRef);
+};
+
+// ── WebRTC & App ───────────────────────────────────
+let pc = null, localStream = null;
+let isMicMuted = false, isCamOff = false;
+let callStartTime = null, timerInterval = null;
+
+const rtcConfig = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' }
+  ]
+};
+const videoConstraints = {
+  video: { width: { ideal: 1920, min: 1280 }, height: { ideal: 1080, min: 720 }, frameRate: { ideal: 30 } },
+  audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, sampleRate: 48000, channelCount: 2 }
+};
+
+async function getMedia() {
+  try { localStream = await navigator.mediaDevices.getUserMedia(videoConstraints); }
+  catch { localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true }); }
+  document.getElementById('localVideo').srcObject = localStream;
+  document.getElementById('localPlaceholder').classList.add('hidden');
+}
+
+function createPC() {
+  pc = new RTCPeerConnection(rtcConfig);
+  localStream.getTracks().forEach(t => {
+    const sender = pc.addTrack(t, localStream);
+    if (t.kind === 'video') {
+      const p = sender.getParameters();
+      if (!p.encodings) p.encodings = [{}];
+      p.encodings[0].maxBitrate = 4000000;
+      sender.setParameters(p).catch(() => {});
+    }
+  });
+  pc.ontrack = (e) => {
+    document.getElementById('remoteVideo').srcObject = e.streams[0];
+    document.getElementById('remotePlaceholder').classList.add('hidden');
+    document.getElementById('qualityBadge').classList.remove('hidden');
+    showCallUI();
+  };
+  pc.oniceconnectionstatechange = () => {
+    if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') endCallWithSummary();
+  };
+}
+
+async function collectICE(pcObj) {
+  return new Promise(resolve => {
+    const cands = [];
+    const t = setTimeout(() => resolve(cands), 3000);
+    pcObj.onicecandidate = e => {
+      if (e.candidate) cands.push(e.candidate);
+      else { clearTimeout(t); resolve(cands); }
+    };
+  });
+}
+
+window.startCall = async function() {
+  await getMedia(); createPC();
+  const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+  await pc.setLocalDescription(offer);
+  const cands = await collectICE(pc);
+  const enc = btoa(unescape(encodeURIComponent(JSON.stringify({ sdp: pc.localDescription, candidates: cands }))));
+  document.getElementById('stepCreate').classList.add('hidden');
+  document.getElementById('stepAnswer').style.opacity = '0.4';
+  document.getElementById('stepOffer').classList.remove('hidden');
+  document.getElementById('stepFinal').classList.remove('hidden');
+  document.getElementById('offerText').value = enc;
+};
+
+window.acceptCall = async function() {
+  const enc = document.getElementById('offerInput').value.trim();
+  if (!enc) { alert('Вставь код приглашения!'); return; }
+  let p; try { p = JSON.parse(decodeURIComponent(escape(atob(enc)))); } catch { alert('Неверный код.'); return; }
+  await getMedia(); createPC();
+  await pc.setRemoteDescription(new RTCSessionDescription(p.sdp));
+  for (const c of (p.candidates||[])) await pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
+  const ans = await pc.createAnswer();
+  await pc.setLocalDescription(ans);
+  const myCands = await collectICE(pc);
+  const enc2 = btoa(unescape(encodeURIComponent(JSON.stringify({ sdp: pc.localDescription, candidates: myCands }))));
+  document.getElementById('stepAnswer').classList.add('hidden');
+  document.getElementById('stepAnswerSend').classList.remove('hidden');
+  document.getElementById('answerText').value = enc2;
+};
+
+window.finalConnect = async function() {
+  const enc = document.getElementById('answerInput').value.trim();
+  if (!enc) { alert('Вставь ответ от неё!'); return; }
+  let p; try { p = JSON.parse(decodeURIComponent(escape(atob(enc)))); } catch { alert('Неверный код.'); return; }
+  await pc.setRemoteDescription(new RTCSessionDescription(p.sdp));
+  for (const c of (p.candidates||[])) await pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
+};
+
+function startTimer() {
+  callStartTime = Date.now();
+  const el = document.getElementById('liveTimer');
+  el.classList.remove('hidden');
+  timerInterval = setInterval(() => {
+    el.textContent = fmtClock(Math.floor((Date.now() - callStartTime) / 1000));
+  }, 1000);
+}
+function stopTimer() {
+  clearInterval(timerInterval); timerInterval = null;
+  const elapsed = callStartTime ? Math.floor((Date.now() - callStartTime) / 1000) : 0;
+  callStartTime = null;
+  document.getElementById('liveTimer').classList.add('hidden');
+  return elapsed;
+}
+
+function showCallUI() {
+  document.getElementById('connectPanel').classList.add('hidden');
+  document.getElementById('statsPanel').classList.add('hidden');
+  document.getElementById('callControls').classList.remove('hidden');
+  document.getElementById('callStatus').classList.remove('hidden');
+  startTimer();
+}
+
+async function endCallWithSummary() {
+  const dur = stopTimer();
+  if (pc) { pc.close(); pc = null; }
+  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+  if (dur >= 5) {
+    await window.saveCallToFirebase(dur);
+    showSummary(dur);
+  } else {
+    location.reload();
+  }
+}
+
+function showSummary(dur) {
+  const total = allCalls.reduce((s, c) => s + c.seconds, 0);
+  const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60);
+  const ov = document.createElement('div');
+  ov.className = 'summary-overlay';
+  ov.innerHTML = `<div class="summary-box">
+    <h3>звонок завершён</h3>
+    <p>длительность этого разговора</p>
+    <div class="summary-duration">${fmtClock(dur)}</div>
+    <div class="summary-total">всего вместе: ${h}ч ${m}м · ${allCalls.length + 1} ${pluralCalls(allCalls.length + 1)}</div>
+    <button class="btn-primary" style="width:100%;margin-top:8px" onclick="location.reload()">закрыть</button>
+  </div>`;
+  document.body.appendChild(ov);
+}
+
+// Controls
+document.getElementById('toggleMic').onclick = () => {
+  isMicMuted = !isMicMuted;
+  localStream?.getAudioTracks().forEach(t => t.enabled = !isMicMuted);
+  document.getElementById('toggleMic').classList.toggle('muted', isMicMuted);
+  document.getElementById('toggleMic').textContent = isMicMuted ? '🔇' : '🎤';
+};
+document.getElementById('toggleCam').onclick = () => {
+  isCamOff = !isCamOff;
+  localStream?.getVideoTracks().forEach(t => t.enabled = !isCamOff);
+  document.getElementById('toggleCam').classList.toggle('muted', isCamOff);
+  document.getElementById('toggleCam').textContent = isCamOff ? '🚫' : '📷';
+};
+document.getElementById('endCall').onclick = endCallWithSummary;
+document.getElementById('toggleFullscreen').onclick = () => {
+  const el = document.getElementById('remoteWrap');
+  if (!document.fullscreenElement) el.requestFullscreen().catch(()=>{});
+  else document.exitFullscreen();
+};
+
+window.copyOffer = function() {
+  const v = document.getElementById('offerText').value;
+  navigator.clipboard.writeText(v).then(() => alert('Скопировано! Отправь ей.')).catch(() => { document.getElementById('offerText').select(); document.execCommand('copy'); });
+};
+window.copyAnswer = function() {
+  const v = document.getElementById('answerText').value;
+  navigator.clipboard.writeText(v).then(() => alert('Скопировано! Отправь ему.')).catch(() => { document.getElementById('answerText').select(); document.execCommand('copy'); });
+};
+
+</script>
+</body>
+</html>
